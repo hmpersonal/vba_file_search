@@ -6,11 +6,13 @@ Sub SearchFilesInFolder()
     Dim searchWords As Variant
     Dim resultsRow As Long
     Dim fileCount As Long
+    Dim processedFiles As Long
     
-    Set ws = ThisWorkbook.Sheets("X")
-    searchFolder = ws.Range("A1").Value
-    searchWords = ws.Range("A2:E2").Value
+    Set ws = ThisWorkbook.Sheets("FILE_SEARCH")
+    searchFolder = ws.Range("B1").Value
+    searchWords = ws.Range("B2:F2").Value
     resultsRow = 5
+    processedFiles = 0
     
     If searchFolder = "" Then
         MsgBox "検索対象のフォルダパスが指定されていません。", vbExclamation
@@ -19,8 +21,7 @@ Sub SearchFilesInFolder()
     
     ' ファイル数を取得
     fileCount = CountFilesInFolder(searchFolder)
-    ws.Range("A4").Value = "Total Files"
-    ws.Range("B4").Value = fileCount
+    ws.Range("B3").Value = fileCount
     
     ' 検索ワードがブランクでないものをリストアップ
     Dim wordList As Collection
@@ -35,7 +36,9 @@ Sub SearchFilesInFolder()
     ' ファイルを検索
     Dim fso As Object
     Set fso = CreateObject("Scripting.FileSystemObject")
-    SearchInFolder fso.GetFolder(searchFolder), wordList, ws, resultsRow
+    Application.StatusBar = "Processing 0/" & fileCount & " files..."
+    SearchInFolder fso.GetFolder(searchFolder), wordList, ws, resultsRow, processedFiles, fileCount
+    Application.StatusBar = False
 End Sub
 
 Function CountFilesInFolder(folderPath As String) As Long
@@ -60,16 +63,18 @@ Function CountFilesInFolder(folderPath As String) As Long
     CountFilesInFolder = count
 End Function
 
-Sub SearchInFolder(folder As Object, wordList As Collection, ws As Worksheet, ByRef resultsRow As Long)
+Sub SearchInFolder(folder As Object, wordList As Collection, ws As Worksheet, ByRef resultsRow As Long, ByRef processedFiles As Long, fileCount As Long)
     Dim file As Object
     Dim subfolder As Object
     
     For Each file In folder.Files
+        processedFiles = processedFiles + 1
+        Application.StatusBar = "Processing " & processedFiles & "/" & fileCount & " files..."
         SearchInFile file.Path, wordList, ws, resultsRow
     Next file
     
     For Each subfolder In folder.Subfolders
-        SearchInFolder subfolder, wordList, ws, resultsRow
+        SearchInFolder subfolder, wordList, ws, resultsRow, processedFiles, fileCount
     Next subfolder
 End Sub
 
