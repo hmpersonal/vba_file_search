@@ -1,0 +1,69 @@
+Sub GetAllFileExtensions()
+    Dim folderPath As String
+    Dim fileExtensions As Collection
+    Dim ws As Worksheet
+    Dim newWs As Worksheet
+    Dim cell As Range
+    Dim fso As Object
+    Dim folder As Object
+    Dim subFolder As Object
+    Dim file As Object
+    
+    ' シート"FILE_SEARCH"からフォルダパスを取得
+    Set ws = ThisWorkbook.Sheets("FILE_SEARCH")
+    folderPath = ws.Range("B1").Value
+    
+    ' ファイルシステムオブジェクトの作成
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    
+    ' ファイル拡張子を保存するコレクションを作成
+    Set fileExtensions = New Collection
+    
+    ' フォルダの取得
+    Set folder = fso.GetFolder(folderPath)
+    
+    ' ファイルとサブフォルダを再帰的に処理
+    Call GetExtensions(folder, fileExtensions)
+    
+    ' 新しいシートを作成
+    Set newWs = ThisWorkbook.Sheets.Add
+    newWs.Name = "Extensions"
+    
+    ' コレクションから重複を除去してシートに出力
+    Dim uniqueExtensions As Collection
+    Set uniqueExtensions = New Collection
+    
+    On Error Resume Next
+    For Each ext In fileExtensions
+        uniqueExtensions.Add ext, CStr(ext)
+    Next ext
+    On Error GoTo 0
+    
+    ' シートに出力
+    Dim i As Integer
+    i = 1
+    For Each ext In uniqueExtensions
+        newWs.Cells(i, 1).Value = ext
+        i = i + 1
+    Next ext
+    
+    ' 終了メッセージ
+    MsgBox "ファイル拡張子の取得が完了しました。"
+End Sub
+
+Sub GetExtensions(folder As Object, fileExtensions As Collection)
+    Dim file As Object
+    Dim subFolder As Object
+    
+    ' フォルダ内のすべてのファイルを処理
+    For Each file In folder.Files
+        Dim ext As String
+        ext = Mid(file.Name, InStrRev(file.Name, ".") + 1)
+        fileExtensions.Add ext
+    Next file
+    
+    ' サブフォルダ内のファイルを再帰的に処理
+    For Each subFolder In folder.SubFolders
+        Call GetExtensions(subFolder, fileExtensions)
+    Next subFolder
+End Sub
