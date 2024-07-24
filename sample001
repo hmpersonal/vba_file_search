@@ -7,6 +7,7 @@ Sub SearchFilesInFolder()
     Dim resultsRow As Long
     Dim fileCount As Long
     Dim processedFiles As Long
+    Dim extensions As Collection
     
     Set ws = ThisWorkbook.Sheets("FILE_SEARCH")
     searchFolder = ws.Range("B1").Value
@@ -19,8 +20,11 @@ Sub SearchFilesInFolder()
         Exit Sub
     End If
     
+    ' 拡張子を取得
+    Set extensions = GetExtensions()
+    
     ' ファイル数を取得
-    fileCount = CountFilesInFolder(searchFolder)
+    fileCount = CountFilesInFolder(searchFolder, extensions)
     ws.Range("B3").Value = fileCount
     
     ' 検索ワードがブランクでないものをリストアップ
@@ -37,11 +41,37 @@ Sub SearchFilesInFolder()
     Dim fso As Object
     Set fso = CreateObject("Scripting.FileSystemObject")
     Application.StatusBar = "Processing 0/" & fileCount & " files..."
-    SearchInFolder fso.GetFolder(searchFolder), wordList, ws, resultsRow, processedFiles, fileCount
+    SearchInFolder fso.GetFolder(searchFolder), wordList, ws, resultsRow, processedFiles, fileCount, extensions
     Application.StatusBar = False
+    
+    MsgBox "処理が完了しました。", vbInformation
 End Sub
 
-Function CountFilesInFolder(folderPath As String) As Long
+Function GetExtensions() As Collection
+    Dim extensions As Collection
+    Set extensions = New Collection
+    
+    On Error Resume Next
+    Dim wsExt As Worksheet
+    Set wsExt = ThisWorkbook.Sheets("Extensions")
+    On Error GoTo 0
+    
+    If Not wsExt Is Nothing Then
+        Dim lastRow As Long
+        lastRow = wsExt.Cells(wsExt.Rows.Count, "A").End(xlUp).Row
+        
+        Dim i As Long
+        For i = 1 To lastRow
+            If wsExt.Cells(i, "B").Value = "●" Then
+                extensions.Add wsExt.Cells(i, "A").Value
+            End If
+        Next i
+    End If
+    
+    Set GetExtensions = extensions
+End Function
+
+Function CountFilesInFolder(folderPath As String, extensions As Collection) As Long
     Dim fso As Object
     Dim folder As Object
     Dim subfolder As Object
@@ -53,28 +83,43 @@ Function CountFilesInFolder(folderPath As String) As Long
     count = 0
     
     For Each file In folder.Files
-        count = count + 1
+        If extensions.Count = 0 Or IsInExtensions(file.Name, extensions) Then
+            count = count + 1
+        End If
     Next file
     
     For Each subfolder In folder.Subfolders
-        count = count + CountFilesInFolder(subfolder.Path)
+        count = count + CountFilesInFolder(subfolder.Path, extensions)
     Next subfolder
     
     CountFilesInFolder = count
 End Function
 
-Sub SearchInFolder(folder As Object, wordList As Collection, ws As Worksheet, ByRef resultsRow As Long, ByRef processedFiles As Long, fileCount As Long)
+Function IsInExtensions(fileName As String, extensions As Collection) As Boolean
+    Dim extension As Variant
+    For Each extension In extensions
+        If Right(fileName, Len(extension)) = extension Then
+            IsInExtensions = True
+            Exit Function
+        End If
+    Next extension
+    IsInExtensions = False
+End Function
+
+Sub SearchInFolder(folder As Object, wordList As Collection, ws As Worksheet, ByRef resultsRow As Long, ByRef processedFiles As Long, fileCount As Long, extensions As Collection)
     Dim file As Object
     Dim subfolder As Object
     
     For Each file In folder.Files
-        processedFiles = processedFiles + 1
-        Application.StatusBar = "Processing " & processedFiles & "/" & fileCount & " files..."
-        SearchInFile file.Path, wordList, ws, resultsRow
+        If extensions.Count = 0 Or IsInExtensions(file.Name, extensions) Then
+            processedFiles = processedFiles + 1
+            Application.StatusBar = "Processing " & processedFiles & "/" & fileCount & " files..."
+            SearchInFile file.Path, wordList, ws, resultsRow
+        End If
     Next file
     
     For Each subfolder In folder.Subfolders
-        SearchInFolder subfolder, wordList, ws, resultsRow, processedFiles, fileCount
+        SearchInFolder subfolder, wordList, ws, resultsRow, processedFiles, fileCount, extensions
     Next subfolder
 End Sub
 
