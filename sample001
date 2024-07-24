@@ -1,0 +1,120 @@
+Option Explicit
+
+Sub SearchFilesInFolder()
+    Dim ws As Worksheet
+    Dim searchFolder As String
+    Dim searchWords As Variant
+    Dim resultsRow As Long
+    Dim fileCount As Long
+    
+    Set ws = ThisWorkbook.Sheets("X")
+    searchFolder = ws.Range("A1").Value
+    searchWords = ws.Range("A2:E2").Value
+    resultsRow = 5
+    
+    If searchFolder = "" Then
+        MsgBox "検索対象のフォルダパスが指定されていません。", vbExclamation
+        Exit Sub
+    End If
+    
+    ' ファイル数を取得
+    fileCount = CountFilesInFolder(searchFolder)
+    ws.Range("A4").Value = "Total Files"
+    ws.Range("B4").Value = fileCount
+    
+    ' 検索ワードがブランクでないものをリストアップ
+    Dim wordList As Collection
+    Set wordList = New Collection
+    Dim i As Integer
+    For i = LBound(searchWords, 2) To UBound(searchWords, 2)
+        If searchWords(1, i) <> "" Then
+            wordList.Add searchWords(1, i)
+        End If
+    Next i
+    
+    ' ファイルを検索
+    Dim fso As Object
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    SearchInFolder fso.GetFolder(searchFolder), wordList, ws, resultsRow
+End Sub
+
+Function CountFilesInFolder(folderPath As String) As Long
+    Dim fso As Object
+    Dim folder As Object
+    Dim subfolder As Object
+    Dim file As Object
+    Dim count As Long
+    
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    Set folder = fso.GetFolder(folderPath)
+    count = 0
+    
+    For Each file In folder.Files
+        count = count + 1
+    Next file
+    
+    For Each subfolder In folder.Subfolders
+        count = count + CountFilesInFolder(subfolder.Path)
+    Next subfolder
+    
+    CountFilesInFolder = count
+End Function
+
+Sub SearchInFolder(folder As Object, wordList As Collection, ws As Worksheet, ByRef resultsRow As Long)
+    Dim file As Object
+    Dim subfolder As Object
+    
+    For Each file In folder.Files
+        SearchInFile file.Path, wordList, ws, resultsRow
+    Next file
+    
+    For Each subfolder In folder.Subfolders
+        SearchInFolder subfolder, wordList, ws, resultsRow
+    Next subfolder
+End Sub
+
+Sub SearchInFile(filePath As String, wordList As Collection, ws As Worksheet, ByRef resultsRow As Long)
+    Dim fileContent As String
+    Dim fileNum As Integer
+    Dim line As String
+    Dim pos As Long
+    Dim word As Variant
+    
+    On Error Resume Next
+    fileNum = FreeFile
+    Open filePath For Input As #fileNum
+    If Err.Number <> 0 Then
+        On Error GoTo 0
+        Exit Sub
+    End If
+    
+    fileContent = Input$(LOF(fileNum), #fileNum)
+    Close #fileNum
+    On Error GoTo 0
+    
+    For Each word In wordList
+        pos = InStr(1, fileContent, word, vbTextCompare)
+        If pos > 0 Then
+            line = GetLineContainingWord(fileContent, word, pos)
+            ws.Cells(resultsRow, 1).Value = word
+            ws.Cells(resultsRow, 2).Value = filePath
+            ws.Cells(resultsRow, 3).Value = line
+            resultsRow = resultsRow + 1
+        End If
+    Next word
+End Sub
+
+Function GetLineContainingWord(fileContent As String, word As String, pos As Long) As String
+    Dim startPos As Long
+    Dim endPos As Long
+    Dim line As String
+    
+    startPos = InStrRev(fileContent, vbCrLf, pos - 1) + 2
+    endPos = InStr(pos, fileContent, vbCrLf)
+    
+    If startPos = 2 Then startPos = 1
+    If endPos = 0 Then endPos = Len(fileContent) + 1
+    
+    line = Mid(fileContent, startPos, endPos - startPos)
+    GetLineContainingWord = line
+End Function
