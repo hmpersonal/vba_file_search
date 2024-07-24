@@ -98,10 +98,12 @@ Sub SearchInFile(filePath As String, wordList As Collection, ws As Worksheet, By
     On Error GoTo 0
     
     For Each word In wordList
-        pos = InStr(1, fileContent, word, vbTextCompare)
+        Dim wordStr As String
+        wordStr = CStr(word)
+        pos = InStr(1, fileContent, wordStr, vbTextCompare)
         If pos > 0 Then
-            line = GetLineContainingWord(fileContent, word, pos)
-            ws.Cells(resultsRow, 1).Value = word
+            line = GetLineContainingWord(fileContent, wordStr, pos)
+            ws.Cells(resultsRow, 1).Value = wordStr
             ws.Cells(resultsRow, 2).Value = filePath
             ws.Cells(resultsRow, 3).Value = line
             resultsRow = resultsRow + 1
